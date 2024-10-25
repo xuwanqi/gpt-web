@@ -8343,7 +8343,7 @@
                                     if (chunk) {
                                         try {
                                             if (chunk.startsWith("event")) {
-                                                event = chunk.slice(7);
+                                                event = chunk.slice(6);
                                             } else {
                                                 payload = JSON.parse(chunk.slice(5));
                                             }
