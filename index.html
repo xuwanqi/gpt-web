@@ -8343,7 +8343,7 @@
                                     if (chunk) {
                                         try {
                                             if (chunk.startsWith("event")) {
-                                                event = chunk.slice(6);
+                                                event = chunk
                                             } else {
                                                 payload = JSON.parse(chunk.slice(5));
                                             }
@@ -8351,7 +8351,7 @@
                                             break;
                                         }
                                         if (chunk.startsWith("event")) continue;
-                                        if (event === "message_delta") {
+                                        if (event.includes("message_delta")) {
                                             let lenStop = payload.delta.stop_reason === "max_tokens";
                                             longReplyFlag = enableLongReply && lenStop;
                                             let ele = currentResEle.lastChild.children[0].children[0];
@@ -8362,7 +8362,7 @@
                                                 autoSpeechEvent(voiceText, currentResEle, false, stop);
                                             }
                                             break;
-                                        } else if (event === "content_block_delta") {
+                                        } else if (event.includes("content_block_delta")) {
                                             if (payload.delta.type !== "text_delta") continue;
                                             let content = payload.delta.text;
                                             if (content) {
