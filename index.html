@@ -2581,6 +2581,25 @@
                         </div>
                         <div>GPT-4o</div>
                     </div>
+
+                    <div class="modelSingle" data-value="o1-mini" data-ver="o1-mini">
+                        <div class="modelAvatar gptAvatar">
+                            <svg width="24" height="24">
+                                <use xlink:href="#aiIcon"></use>
+                            </svg>
+                        </div>
+                        <div>o1-mini</div>
+                    </div>
+
+                    <div class="modelSingle" data-value="o1-preview" data-ver="o1-preview">
+                        <div class="modelAvatar gptAvatar">
+                            <svg width="24" height="24">
+                                <use xlink:href="#aiIcon"></use>
+                            </svg>
+                        </div>
+                        <div>o1-preview</div>
+                    </div>
+
                     <div class="modelSingle" data-value="claude-3.5-sonnet" data-ver="3.5 Sonnet">
                         <div class="modelAvatar">
                             <svg width="30" height="30">
@@ -5372,6 +5391,7 @@
         };
         let modelVersion; // 模型版本
         let modelType; // 1:ChatGPT，2:Gemini，3:Claude
+        let extraModelType; // 0:正常, 1:特殊（指代o1）
         let apiHost; // api反代地址
         let geminiApiHost;
         let claudeApiHost;
@@ -6822,6 +6842,10 @@
                 } else if (modelVersion.startsWith("gemini")) {
                     modelType = 2;
                     modelName.textContent = "Gemini";
+                } else if (modelVersion.startsWith("o1")) {
+                    modelType = 1;
+                    extraModelType = 1;
+                    modelName.textContent = "";
                 } else {
                     modelType = 3;
                     modelName.textContent = "Claude";
@@ -8124,7 +8148,7 @@
                 }
                 let headers = { "Content-Type": "application/json" };
                 let url, body;
-                if (modelType === 1) {
+                if (modelType === 1 && extraModelType === 0) {
                     dataSlice = dataSlice.map(item => {
                         if (item.role === "assistant") return { role: item.role, content: item.content };
                         else return item;
@@ -8135,6 +8159,19 @@
                         messages: dataSlice,
                         model: currentModelName,
                         stream: true,
+                        temperature: roleTemp,
+                        top_p: roleNature
+                    });
+                } else if (modelType === 1 && extraModelType === 1) {
+                    dataSlice = dataSlice.map(item => {
+                        if (item.role === "assistant") return { role: item.role, content: item.content };
+                        else return item;
+                    })
+                    url = apiHost + ((apiHost.length && !apiHost.endsWith("/")) ? "/" : "") + API_URL;
+                    if (customAPIKey) headers["Authorization"] = "Bearer " + customAPIKey;
+                    body = JSON.stringify({
+                        messages: dataSlice,
+                        model: currentModelName,
                         temperature: roleTemp,
                         top_p: roleNature
                     });
@@ -8199,11 +8236,12 @@
                 const decoder = new TextDecoder();
                 const reader = res.body.getReader();
                 let readChunk;
-                if (modelType === 1) {
+                if (modelType === 1 && extraModelType === 0) {
                     readChunk = async () => {
                         return reader.read().then(async ({ value, done }) => {
                             if (!done) {
                                 value = decoder.decode(value);
+                                console.log(value)
                                 let chunks = value.match(/[^\n]+/g);
                                 if (!chunks) return readChunk();
                                 let payload;
@@ -8229,6 +8267,60 @@
                                             break;
                                         } else {
                                             let content = payload.choices[0].delta.content;
+                                            if (content) {
+                                                if (!progressData && !content.trim()) continue;
+                                                if (existVoice && enableAutoVoice && currentVoiceIdx === autoVoiceDataIdx) {
+                                                    let spliter = content.match(/\.|\?|!|~|。|？|！|\n/);
+                                                    if (spliter) {
+                                                        let voiceText = progressData.slice(autoVoiceIdx) + content.slice(0, spliter.index + 1);
+                                                        autoVoiceIdx += voiceText.length;
+                                                        autoSpeechEvent(voiceText, currentResEle);
+                                                    }
+                                                }
+                                                if (progressData && textSpeed) await delay();
+                                                progressData += content;
+                                                container.innerHTML = md.render(progressData);
+                                                if (container.children.length > 1 && currentResEle.children[1].children.length === container.children.length) {
+                                                    morphdom(currentResEle.children[1].lastElementChild, container.lastElementChild);
+                                                } else {
+                                                    morphdom(currentResEle.children[1], container, { childrenOnly: true });
+                                                }
+                                                scrollToBottom();
+                                            }
+                                        }
+                                    }
+                                }
+                                return readChunk();
+                            } else {
+                                if (isRefresh) {
+                                    data[refreshIdx].content = progressData;
+                                    data[refreshIdx].model = currentModelName;
+                                } else {
+                                    if (long) { data[data.length - 1].content = progressData }
+                                    else { data.push({ role: "assistant", content: progressData, model: currentModelName }) }
+                                }
+                                if (longReplyFlag) return streamGen(true);
+                                stopLoading(false);
+                            }
+                        });
+                    };
+                } else if (modelType === 1 && extraModelType === 1) {
+                    readChunk = async () => {
+                        return reader.read().then(async ({ value, done }) => {
+                            if (!done) {
+                                value = decoder.decode(value);
+
+                                let payload;
+                                for (let i = 0; i < 1; i++) {
+                                    let chunk = value;
+                                    if (chunk) {
+                                        try {
+                                            payload = JSON.parse(chunk);
+                                        } catch (e) {
+                                            break;
+                                        }
+                                        if (payload.choices[0].finish_reason) {
+                                            let content = payload.choices[0].message.content;
                                             if (content) {
                                                 if (!progressData && !content.trim()) continue;
                                                 if (existVoice && enableAutoVoice && currentVoiceIdx === autoVoiceDataIdx) {
