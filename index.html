@@ -5855,7 +5855,7 @@
             if (ele.parentElement.className === "request") {
                 ele.innerHTML = `<img src="${userAvatar}" />`;
             } else {
-                if (model.startsWith("gpt")) {
+                if (model.startsWith("gpt") || model.startsWith("o1")) {
                     ele.classList.add("gptAvatar")
                     ele.innerHTML = `<svg width="24" height="24"><use xlink:href="#aiIcon"></use></svg>`;
                 } else if (model.startsWith("gemini")) {
